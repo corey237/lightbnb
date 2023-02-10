@@ -112,22 +112,44 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  const sqlQuery = `
-    SELECT *
-    FROM properties;
-    LIMIT $1
+  console.log(options);
+  const values = [];
+  let sqlQuery = `
+    SELECT properties.*, avg(property_reviews.rating) as average_rating FROM properties JOIN property_reviews ON property_reviews.property_id = properties.id WHERE 1=1
     `
-    const values = [limit]
+    if (options.city) {
+      values.push(`%${options.city}%`)
+      sqlQuery += ` AND city LIKE $${values.length}`
+    }
+    if (options.minimum_price_per_night) {
+      values.push(Number(options.minimum_price_per_night) * 100)
+      sqlQuery += ` AND cost_per_night >= $${values.length}`
+    }
+
+    if (options.maximum_price_per_night) {
+      values.push(Number(options.maximum_price_per_night) * 100)
+      sqlQuery += ` AND cost_per_night <= $${values.length}` 
+    }
+
+    sqlQuery += `GROUP BY properties.id\n`;
+    
+    if (options.rating) {
+      values.push(Number(options.rating));
+      sqlQuery += ` HAVING AVG(property_reviews.rating) >= $${values.length}`;
+      console.log(options.rating);
+    }
+    values.push(limit);
+    sqlQuery += ` LIMIT $${values.length}`
+    sqlQuery += `;`;
+
+
     return pool.query(sqlQuery, values)
       .then((res) => {
-        console.log(res.rows);
-        // res.rows.forEach((property, index) => {
-        //   limitedProperties[index] = property;
-        // })
-        return res.rows
+        console.log('res', res.rows)
+        return res.rows;
       })
       .catch((err) => {
-        return err.message
+        return err;
       })
 }
 exports.getAllProperties = getAllProperties;
